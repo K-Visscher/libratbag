@@ -48,6 +48,7 @@ enum driver {
 	ROCCAT,
 	ETEKCITY,
 	GSKILL,
+	MICROSOFT,
 	LOGITECH_G300,
 	LOGITECH_G600,
 	STEELSERIES,
@@ -266,6 +267,7 @@ static const struct driver_map {
 	{ GSKILL, "gskill", NULL },
 	{ LOGITECH_G300, "logitech_g300", NULL},
 	{ LOGITECH_G600, "logitech_g600", NULL},
+	{ MICROSOFT, "microsoft-pro-intellimouse", NULL},
 	{ STEELSERIES, "steelseries", init_data_steelseries },
 };
 

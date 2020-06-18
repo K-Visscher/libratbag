@@ -599,6 +599,7 @@ ratbag_create_context(const struct ratbag_interface *interface,
 	ratbag_register_driver(ratbag, &hidpp10_driver);
 	ratbag_register_driver(ratbag, &logitech_g300_driver);
 	ratbag_register_driver(ratbag, &logitech_g600_driver);
+	ratbag_register_driver(ratbag, &microsoft_pro_intellimouse_driver);
 	ratbag_register_driver(ratbag, &roccat_driver);
 	ratbag_register_driver(ratbag, &gskill_driver);
 	ratbag_register_driver(ratbag, &steelseries_driver);

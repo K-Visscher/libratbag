@@ -171,6 +171,7 @@ src_libratbag = [
 	'src/driver-hidpp10.c',
 	'src/driver-logitech-g300.c',
 	'src/driver-logitech-g600.c',
+	'src/driver-microsoft-pro-intellimouse.c',
 	'src/driver-roccat.c',
 	'src/driver-roccat-kone-pure.c',
 	'src/driver-gskill.c',
