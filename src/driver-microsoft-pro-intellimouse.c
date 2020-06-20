@@ -12,7 +12,7 @@
 
 #define MICROSOFT_NUM_PROFILE 0x01
 #define MICROSOFT_NUM_DPI 0x01
-#define MICROSOFT_NUM_BUTTONS 0x05
+#define MICROSOFT_NUM_BUTTONS 0x00 /* TODO: IMPLEMENT BUTTON REMAPPING */
 #define MICROSOFT_NUM_LED 0x01
 #define MICROSOFT_MIN_DPI 0xC8
 #define MICROSOFT_MAX_DPI 0x3E80
@@ -60,36 +60,6 @@ static unsigned int microsoft_pro_intellimouse_rate_to_raw(unsigned int rate)
     struct microsoft_pro_intellimouse_report_rate_mapping* mapping;
     ARRAY_FOR_EACH(microsoft_pro_intellimouse_report_rate_mapping, mapping) {
 	if (mapping->rate == rate)
-	    return mapping->raw;
-    }
-    return 0;
-}
-
-struct microsoft_pro_intellimouse_lod_mapping {
-    unsigned int raw;
-    unsigned int lod;
-};
-
-static struct microsoft_pro_intellimouse_lod_mapping microsoft_pro_intellimouse_lod_mapping[] = {
-	{ 0x00, 0x02 },
-	{ 0x01, 0x03 }
-};
-
-static int microsoft_pro_intellimouse_raw_to_lod(uint8_t raw)
-{
-    struct microsoft_pro_intellimouse_lod_mapping* mapping;
-    ARRAY_FOR_EACH(microsoft_pro_intellimouse_lod_mapping, mapping) {
-	if (mapping->raw == raw)
-	    return mapping->lod;
-    }
-    return 0;
-}
-
-static int microsoft_pro_intellimouse_lod_to_raw(uint8_t lod)
-{
-    struct microsoft_pro_intellimouse_lod_mapping* mapping;
-    ARRAY_FOR_EACH(microsoft_pro_intellimouse_lod_mapping, mapping) {
-	if (mapping->lod == lod)
 	    return mapping->raw;
     }
     return 0;
@@ -146,18 +116,6 @@ static int microsoft_pro_intellimouse_write_property(struct ratbag_device* devic
     return 0;
 }
 
-static int microsoft_pro_intellimouse_read_lod(struct ratbag_device* device)
-{
-    /* TODO */
-    return -ENOSYS;
-}
-
-static int microsoft_pro_intellimouse_write_lod(struct ratbag_device* device, unsigned int lod)
-{
-    /* TODO */
-    return -ENOSYS;
-}
-
 static int microsoft_pro_intellimouse_read_led(struct ratbag_led* led)
 {
     struct ratbag_profile* profile = led->profile;
@@ -191,9 +149,9 @@ static int microsoft_pro_intellimouse_write_led(struct ratbag_led* led)
 
     uint8_t write_buf[3] =
     {
-	0xFF & led->color.red,
-	0xFF & led->color.green,
-	0xFF & led->color.blue
+	(uint8_t) led->color.red,
+	(uint8_t) led->color.green,
+	(uint8_t) led->color.blue
     };
 
     ret = microsoft_pro_intellimouse_write_property(device, MICROSOFT_LED_WRITE_PROPERTY_ID, write_buf, sizeof(write_buf));
@@ -203,7 +161,7 @@ static int microsoft_pro_intellimouse_write_led(struct ratbag_led* led)
     return 0;
 }
 
-static int microsoft_pro_intellimouse_read_dpi(struct ratbag_device* device, unsigned int* dpi)
+static int microsoft_pro_intellimouse_read_dpi(struct ratbag_device* device, uint16_t* dpi)
 {
     int ret;
     uint8_t read_buf[2] = { 0 };
@@ -218,10 +176,16 @@ static int microsoft_pro_intellimouse_read_dpi(struct ratbag_device* device, uns
     return 0;
 }
 
-static int microsoft_pro_intellimouse_write_dpi(struct ratbag_device* device, unsigned int dpi)
+static int microsoft_pro_intellimouse_write_dpi(struct ratbag_device* device, uint16_t dpi)
 {
-    /*TODO*/
-    return -ENOSYS;
+    int ret;
+    uint8_t write_buf[2] = { (uint8_t) dpi, (uint8_t) dpi >> 8 };
+
+    ret = microsoft_pro_intellimouse_write_property(device, MICROSOFT_DPI_WRITE_PROPERTY_ID, write_buf, sizeof(write_buf));
+    if (ret < 0)
+	return ret;
+
+    return 0;
 }
 
 
@@ -242,7 +206,7 @@ static int microsoft_pro_intellimouse_read_report_rate(struct ratbag_device* dev
 static int microsoft_pro_intellimouse_write_report_rate(struct ratbag_device* device, uint16_t rate)
 {
     int ret;
-    uint8_t write_buf[1] = { microsoft_pro_intellimouse_rate_to_raw(rate) };
+    uint8_t write_buf[1] = { (uint8_t) microsoft_pro_intellimouse_rate_to_raw(rate) };
 
     ret = microsoft_pro_intellimouse_write_property(device, MICROSOFT_REPORT_RATE_WRITE_PROPERTY_ID, write_buf, sizeof(write_buf));
     if (ret < 0)
@@ -253,8 +217,28 @@ static int microsoft_pro_intellimouse_write_report_rate(struct ratbag_device* de
 
 static int microsoft_pro_intellimouse_write_profile(struct ratbag_profile* profile)
 {
-    /*TODO*/
-    return -ENOSYS;
+    int ret;
+    struct ratbag_device* device = profile->device;
+    struct ratbag_resolution* resolution;
+    struct ratbag_led* led;
+
+    ret = microsoft_pro_intellimouse_write_report_rate(device, profile->hz);
+    if (ret < 0)
+	return ret;
+
+    ratbag_profile_for_each_resolution(profile, resolution) {
+	ret = microsoft_pro_intellimouse_write_dpi(device, (uint16_t) resolution->dpi_x);
+	if (ret < 0)
+	    return ret;
+    }
+
+    ratbag_profile_for_each_led(profile, led) {
+	ret = microsoft_pro_intellimouse_write_led(led);
+	if (ret < 0)
+	    return ret;
+    }
+
+    return 0;
 }
 
 static int microsoft_pro_intellimouse_read_profile(struct ratbag_profile* profile)
@@ -275,7 +259,7 @@ static int microsoft_pro_intellimouse_read_profile(struct ratbag_profile* profil
 
 
     ratbag_profile_for_each_resolution(profile, resolution) {
-	unsigned int dpi = 0;
+	uint16_t dpi = 0;
 	ret = microsoft_pro_intellimouse_read_dpi(device, &dpi);
 	if (ret < 0)
 	    return ret;
@@ -285,9 +269,7 @@ static int microsoft_pro_intellimouse_read_profile(struct ratbag_profile* profil
 	resolution->is_default = true;
 	resolution->is_active = true;
 
-	ratbag_resolution_set_dpi_list_from_range(resolution,
-	    MICROSOFT_MIN_DPI,
-	    MICROSOFT_MAX_DPI);
+	ratbag_resolution_set_dpi_list_from_range(resolution, MICROSOFT_MIN_DPI, MICROSOFT_MAX_DPI);
     }
 
     ratbag_profile_for_each_led(profile, led) {
@@ -309,17 +291,17 @@ static int microsoft_pro_intellimouse_test_hidraw(struct ratbag_device* device)
 
 static int microsoft_pro_intellimouse_probe(struct ratbag_device* device)
 {
-    int rc;
+    int ret;
     struct ratbag_profile* profile;
 
-    rc = ratbag_find_hidraw(device, microsoft_pro_intellimouse_test_hidraw);
-    if (rc)
-	return rc;
+    ret = ratbag_find_hidraw(device, microsoft_pro_intellimouse_test_hidraw);
+    if (ret)
+	return ret;
 
     ratbag_device_init_profiles(device,
 	MICROSOFT_NUM_PROFILE,
 	MICROSOFT_NUM_DPI,
-	MICROSOFT_NUM_BUTTONS,
+	MICROSOFT_NUM_BUTTONS, /* TODO: IMPLEMENT BUTTON REMAPPING */
 	MICROSOFT_NUM_LED);
 
     ratbag_device_for_each_profile(device, profile)
@@ -331,15 +313,15 @@ static int microsoft_pro_intellimouse_probe(struct ratbag_device* device)
 static int microsoft_pro_intellimouse_commit(struct ratbag_device* device)
 {
     struct ratbag_profile* profile;
-    int rc = 0;
+    int ret;
     list_for_each(profile, &device->profiles, link) {
 	if (!profile->dirty)
 	    continue;
 
 	log_debug(device->ratbag, "profile %d changed, rewriting\n", profile->index);
-	rc = microsoft_pro_intellimouse_write_profile(profile);
-	if (rc)
-	    return rc;
+	ret = microsoft_pro_intellimouse_write_profile(profile);
+	if (ret)
+	    return ret;
     }
     return 0;
 }
